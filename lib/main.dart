@@ -1,6 +1,15 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'firebase_options.dart';
 
-void main() => runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -8,7 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Firestore List',
+      title: 'Firestore List Web',
       theme: ThemeData(colorSchemeSeed: const Color(0xFF2962FF)),
       home: const ItemListApp(),
     );
@@ -23,79 +32,102 @@ class ItemListApp extends StatefulWidget {
 }
 
 class _ItemListAppState extends State<ItemListApp> {
-  // Controller for the input field
   final TextEditingController _newItemTextField = TextEditingController();
+  late final CollectionReference<Map<String, dynamic>> items;
 
-  // Local list of items (Phase 1: local; Phase 2: Firestore stream replaces this).
-  final List<String> _itemList = <String>[];
-
-  // ACTION: add one item from the TextField to the local list.
-  void _addItem() {
-    final newItem = _newItemTextField.text.trim();
-    if (newItem.isEmpty) return;
-    setState(() {
-      _itemList.add(newItem);
-      _newItemTextField.clear();
-    });
+  @override
+  void initState() {
+    super.initState();
+    items = FirebaseFirestore.instance.collection('ITEMS');
   }
 
-  // ACTION: remove the item at the given index.
-  void _removeItemAt(int i) {
-    setState(() {
-      _itemList.removeAt(i); // remove item from list
+  Future<void> _addItem() async {
+    final newItem = _newItemTextField.text.trim();
+    if (newItem.isEmpty) return;
+    await items.add({
+      'item_name': newItem,
+      'createdAt': FieldValue.serverTimestamp(),
     });
+    _newItemTextField.clear();
+  }
+
+  Future<void> _removeItemAt(String id) async {
+    await items.doc(id).delete();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Firestore List Demo')),
+      appBar: AppBar(title: const Text('Firestore List Web Demo')),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
         child: Column(
           children: [
-            // ====== Item Input  ======
-            Row(
-              children: [
-                // ====== Item Name TextField ======
-                Expanded(
-                  child: TextField(
-                    controller: _newItemTextField,
-                    onSubmitted: (_) => _addItem(),
-                    decoration: const InputDecoration(
-                      labelText: 'New Item Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                // ====== Spacer for formating ======
-                const SizedBox(width: 12),
-                // ====== Add Item Button ======
-                FilledButton(onPressed: _addItem, child: const Text('Add')),
-              ],
-            ),
-            // ====== Spacer for formating ======
+            NewItemWidget(),
             const SizedBox(height: 24),
             Expanded(
-              // ====== Item List ======
-              child: ListView.builder(
-                itemCount: _itemList.length,
-                itemBuilder: (context, i) => Dismissible(
-                  key: ValueKey(_itemList[i]),
-                  background: Container(color: Colors.red),
-                  onDismissed: (_) => _removeItemAt(i),
-                  // ====== Item Tile ======
-                  child: ListTile(
-                    leading: const Icon(Icons.check_box),
-                    title: Text(_itemList[i]),
-                    onTap: () => _removeItemAt(i),
-                  ),
-                ),
-              ),
+              child: ItemListWidget(),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget NewItemWidget() {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _newItemTextField,
+            onSubmitted: (_) => _addItem(),
+            decoration: const InputDecoration(
+              labelText: 'New Item Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(onPressed: _addItem, child: const Text('Add')),
+      ],
+    );
+  }
+
+  Widget ItemListWidget() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: items.orderBy('createdAt').snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Text('Firebase Snapshot Error: ${snap.error}');
+        }
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.data == null || snap.data!.docs.isEmpty) {
+          return const Center(child: Text('No Items Yet...'));
+        }
+
+        final docs = snap.data!.docs;
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, i) {
+            final doc = docs[i];
+            final String itemId = doc.id;
+            final String itemName = doc.data()['item_name'] ?? 'Unnamed';
+            return Dismissible(
+              key: ValueKey(itemId),
+              background: Container(color: Colors.red),
+              onDismissed: (_) => _removeItemAt(itemId),
+              child: ListTile(
+                leading: const Icon(Icons.check_box),
+                title: Text(itemName),
+                onTap: () => _removeItemAt(itemId),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
+
