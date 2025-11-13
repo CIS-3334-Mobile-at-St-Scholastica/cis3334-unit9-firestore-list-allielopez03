@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "415768267954",
+    "project_id": "cis3334-firestore-allielopez",
+    "storage_bucket": "cis3334-firestore-allielopez.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:415768267954:android:b9cbe8a044427694938dab",
+        "android_client_info": {
+          "package_name": "css.cis3334.flutter_firestore_itemlist"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA90dAl97wX-JraFZkuW89KO5i7ei96Tbk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
